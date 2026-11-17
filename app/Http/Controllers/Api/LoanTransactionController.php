@@ -3,16 +3,27 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\LoanTransaction;
-use App\Models\InventoryItem;
 use App\Http\Resources\LoanTransactionResource;
+use App\Models\InventoryItem;
+use App\Models\LoanTransaction;
 use Illuminate\Http\Request;
 
 class LoanTransactionController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return LoanTransactionResource::collection(LoanTransaction::with(['user', 'item', 'request'])->get());
+        $user = $request->user();
+
+        if ($user && $user->role === 'admin') {
+            $loans = LoanTransaction::with(['user', 'item'])->latest()->get();
+        } else {
+            $loans = LoanTransaction::with(['user', 'item'])
+                ->where('user_id', $user->id)
+                ->latest()
+                ->get();
+        }
+
+        return response()->json($loans);
     }
 
     public function store(Request $request)
@@ -40,7 +51,7 @@ class LoanTransactionController extends Controller
     {
         $transaction = LoanTransaction::with(['user', 'item', 'request'])->find($id);
 
-        if (!$transaction) {
+        if (! $transaction) {
             return response()->json(['message' => 'Loan transaction not found'], 404);
         }
 
@@ -51,7 +62,7 @@ class LoanTransactionController extends Controller
     {
         $transaction = LoanTransaction::find($id);
 
-        if (!$transaction) {
+        if (! $transaction) {
             return response()->json(['message' => 'Loan transaction not found'], 404);
         }
 
@@ -77,11 +88,12 @@ class LoanTransactionController extends Controller
     {
         $transaction = LoanTransaction::find($id);
 
-        if (!$transaction) {
+        if (! $transaction) {
             return response()->json(['message' => 'Loan transaction not found'], 404);
         }
 
         $transaction->delete();
+
         return response()->json(['message' => 'Loan transaction deleted successfully'], 200);
     }
 }

@@ -3,7 +3,7 @@
 @section('content')
 <div class="bg-white p-6 rounded-lg shadow-md">
     <h2 class="text-3xl font-bold mb-4 text-gray-800">Welcome to Campus Library System</h2>
-    <p class="text-gray-600 mb-6"></p>
+    <p class="text-gray-600 mb-6">Manage inventory, monitor student borrow requests, and track item returns seamlessly.</p>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div class="bg-indigo-50 p-6 rounded-lg border border-indigo-100 shadow-sm">
@@ -27,7 +27,6 @@
 </div>
 
 <script>
-    // Protect route on client-side
     if (!localStorage.getItem('auth_token')) {
         window.location.href = '/login';
     }

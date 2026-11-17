@@ -2,10 +2,10 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\ItemCategory;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
-use App\Models\User;
-use App\Models\ItemCategory;
 
 class InventoryItemTest extends TestCase
 {
@@ -16,7 +16,7 @@ class InventoryItemTest extends TestCase
         $user = User::factory()->create();
 
         $response = $this->actingAs($user, 'sanctum')
-                         ->getJson('/api/inventory-items');
+            ->getJson('/api/inventory-items');
 
         $response->assertStatus(200);
     }
@@ -26,18 +26,18 @@ class InventoryItemTest extends TestCase
         $user = User::factory()->create();
         $category = ItemCategory::create([
             'name' => 'Electronics',
-            'description' => 'Lab Hardware'
+            'description' => 'Lab Hardware',
         ]);
 
         $response = $this->actingAs($user, 'sanctum')
-                         ->postJson('/api/inventory-items', [
-                             'category_id' => $category->id,
-                             'name' => 'Dell Latitude Laptop',
-                             'condition' => 'Good',
-                             'is_available' => true,
-                         ]);
+            ->postJson('/api/inventory-items', [
+                'category_id' => $category->id,
+                'name' => 'Dell Latitude Laptop',
+                'condition' => 'Good',
+                'is_available' => true,
+            ]);
 
         $response->assertStatus(201)
-                 ->assertJsonPath('data.name', 'Dell Latitude Laptop');
+            ->assertJsonPath('data.name', 'Dell Latitude Laptop');
     }
 }

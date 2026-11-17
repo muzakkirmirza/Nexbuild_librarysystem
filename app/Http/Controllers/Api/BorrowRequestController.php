@@ -3,17 +3,28 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\BorrowRequestResource;
 use App\Models\BorrowRequest;
 use App\Models\InventoryItem;
 use App\Models\LoanTransaction;
-use App\Http\Resources\BorrowRequestResource;
 use Illuminate\Http\Request;
 
 class BorrowRequestController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return BorrowRequestResource::collection(BorrowRequest::with(['user', 'item'])->get());
+        $user = $request->user();
+
+        if ($user && $user->role === 'admin') {
+            $requests = BorrowRequest::with(['user', 'item'])->latest()->get();
+        } else {
+            $requests = BorrowRequest::with(['user', 'item'])
+                ->where('user_id', $user->id)
+                ->latest()
+                ->get();
+        }
+
+        return BorrowRequestResource::collection($requests);
     }
 
     public function store(Request $request)
@@ -29,6 +40,7 @@ class BorrowRequestController extends Controller
         $validated['status'] = $validated['status'] ?? 'pending';
 
         $borrowRequest = BorrowRequest::create($validated);
+
         return new BorrowRequestResource($borrowRequest->load(['user', 'item']));
     }
 
@@ -36,7 +48,7 @@ class BorrowRequestController extends Controller
     {
         $borrowRequest = BorrowRequest::with(['user', 'item'])->find($id);
 
-        if (!$borrowRequest) {
+        if (! $borrowRequest) {
             return response()->json(['message' => 'Borrow request not found'], 404);
         }
 
@@ -47,7 +59,7 @@ class BorrowRequestController extends Controller
     {
         $borrowRequest = BorrowRequest::find($id);
 
-        if (!$borrowRequest) {
+        if (! $borrowRequest) {
             return response()->json(['message' => 'Borrow request not found'], 404);
         }
 
@@ -80,11 +92,12 @@ class BorrowRequestController extends Controller
     {
         $borrowRequest = BorrowRequest::find($id);
 
-        if (!$borrowRequest) {
+        if (! $borrowRequest) {
             return response()->json(['message' => 'Borrow request not found'], 404);
         }
 
         $borrowRequest->delete();
+
         return response()->json(['message' => 'Borrow request deleted successfully'], 200);
     }
 }

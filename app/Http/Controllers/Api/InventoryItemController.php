@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\InventoryItem;
 use App\Http\Resources\InventoryItemResource;
+use App\Models\InventoryItem;
 use Illuminate\Http\Request;
 
 class InventoryItemController extends Controller
@@ -14,7 +14,7 @@ class InventoryItemController extends Controller
         $query = InventoryItem::with('category');
 
         if ($request->has('search')) {
-            $query->where('name', 'like', '%' . $request->search . '%');
+            $query->where('name', 'like', '%'.$request->search.'%');
         }
 
         if ($request->has('category_id')) {
@@ -38,6 +38,7 @@ class InventoryItemController extends Controller
         ]);
 
         $item = InventoryItem::create($validated);
+
         return new InventoryItemResource($item->load('category'));
     }
 
@@ -45,7 +46,7 @@ class InventoryItemController extends Controller
     {
         $item = InventoryItem::with(['category', 'maintenanceLogs'])->find($id);
 
-        if (!$item) {
+        if (! $item) {
             return response()->json(['message' => 'Inventory item not found'], 404);
         }
 
@@ -56,7 +57,7 @@ class InventoryItemController extends Controller
     {
         $item = InventoryItem::find($id);
 
-        if (!$item) {
+        if (! $item) {
             return response()->json(['message' => 'Inventory item not found'], 404);
         }
 
@@ -68,6 +69,7 @@ class InventoryItemController extends Controller
         ]);
 
         $item->update($validated);
+
         return new InventoryItemResource($item->load('category'));
     }
 
@@ -75,11 +77,12 @@ class InventoryItemController extends Controller
     {
         $item = InventoryItem::find($id);
 
-        if (!$item) {
+        if (! $item) {
             return response()->json(['message' => 'Inventory item not found'], 404);
         }
 
         $item->delete();
+
         return response()->json(['message' => 'Inventory item deleted successfully'], 200);
     }
 }

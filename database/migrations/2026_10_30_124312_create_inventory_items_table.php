@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('category_id')->constrained('item_categories');
             $table->string('name');
-            $table->string('condition'); 
+            $table->string('condition');
             $table->boolean('is_available')->default(true);
             $table->timestamps();
         });

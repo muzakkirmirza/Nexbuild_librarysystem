@@ -2,21 +2,21 @@
 
 @section('content')
 <div class="bg-white p-6 rounded-lg shadow-md">
-    <!-- Header & Toggle Add Form Button -->
     <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <div>
-            <h2 class="text-2xl font-bold text-gray-800">Inventory Management</h2>
-            <p class="text-sm text-gray-500">Campus library aur lab ke saare items manage karein</p>
+            <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                Inventory Management
+                <span id="role-badge" class="ml-4 px-3 py-1 bg-gray-200 text-gray-800 rounded-full text-xs font-bold uppercase">Loading...</span>
+            </h2>
+            <p class="text-sm text-gray-500">Manage campus library items and real-time inventory</p>
         </div>
-        <button onclick="toggleAddForm()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-md shadow">
+        <button id="add-item-btn" onclick="toggleAddForm()" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-md shadow">
             + Add New Item
         </button>
     </div>
 
-    <!-- Alert Message -->
     <div id="alert-box" class="hidden mb-4 p-3 rounded-md text-sm"></div>
 
-    <!-- Add New Item Form (Hidden by default) -->
     <div id="add-item-box" class="hidden mb-8 bg-gray-50 p-5 rounded-lg border border-gray-200">
         <h3 class="text-lg font-bold text-gray-700 mb-4">Add New Inventory Item</h3>
         <form id="addItemForm" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
@@ -53,7 +53,6 @@
         </form>
     </div>
 
-    <!-- Search & Filter Bar -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-gray-50 p-4 rounded-lg border">
         <div class="md:col-span-2">
             <input type="text" id="search_input" oninput="fetchItems()" placeholder="Search item by name..."
@@ -75,7 +74,6 @@
         </div>
     </div>
 
-    <!-- Inventory Table -->
     <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse">
             <thead>
@@ -109,6 +107,28 @@
         'Accept': 'application/json'
     };
 
+    let userRole = 'student';
+
+    async function checkUserRole() {
+        try {
+            const res = await fetch('/api/user', { headers });
+            const data = await res.json();
+            userRole = data.role || 'student';
+
+            const badge = document.getElementById('role-badge');
+            badge.innerText = userRole + ' View';
+            badge.className = userRole === 'admin' 
+                ? 'ml-4 px-3 py-1 bg-purple-200 text-purple-800 rounded-full text-xs font-bold uppercase' 
+                : 'ml-4 px-3 py-1 bg-blue-200 text-blue-800 rounded-full text-xs font-bold uppercase';
+
+            if (userRole === 'admin') {
+                document.getElementById('add-item-btn').classList.remove('hidden');
+            }
+        } catch (err) {
+            console.error('Error fetching user role:', err);
+        }
+    }
+
     function toggleAddForm() {
         document.getElementById('add-item-box').classList.toggle('hidden');
     }
@@ -121,7 +141,6 @@
         setTimeout(() => alertBox.classList.add('hidden'), 3500);
     }
 
-    // 1. Load Categories for Dropdowns
     async function loadCategories() {
         try {
             const res = await fetch('/api/categories', { headers });
@@ -131,19 +150,18 @@
             const addSelect = document.getElementById('item_category');
             const filterSelect = document.getElementById('filter_category');
 
-            addSelect.innerHTML = '<option value="">Select Category</option>';
-            filterSelect.innerHTML = '<option value="">All Categories</option>';
+            if (addSelect) addSelect.innerHTML = '<option value="">Select Category</option>';
+            if (filterSelect) filterSelect.innerHTML = '<option value="">All Categories</option>';
 
             categories.forEach(cat => {
-                addSelect.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
-                filterSelect.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
+                if (addSelect) addSelect.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
+                if (filterSelect) filterSelect.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
             });
         } catch (err) {
             console.error('Error loading categories:', err);
         }
     }
 
-    // 2. Fetch & Render Inventory Items (with Search & Filters)
     async function fetchItems() {
         const search = document.getElementById('search_input').value;
         const categoryId = document.getElementById('filter_category').value;
@@ -165,66 +183,76 @@
                 return;
             }
 
-            tbody.innerHTML = items.map(item => `
-                <tr class="hover:bg-gray-50">
-                    <td class="p-3 font-medium text-gray-600">#${item.id}</td>
-                    <td class="p-3 font-semibold text-gray-800">${item.name}</td>
-                    <td class="p-3 text-gray-600">${item.category ? item.category.name : 'N/A'}</td>
-                    <td class="p-3">
-                        <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">${item.condition}</span>
-                    </td>
-                    <td class="p-3">
-                        ${item.is_available
-                            ? '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Available</span>'
-                            : '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Issued</span>'}
-                    </td>
-                    <td class="p-3 text-right">
+            tbody.innerHTML = items.map(item => {
+                let actionColumn = '<span class="text-xs text-gray-400">-</span>';
+                if (userRole === 'admin') {
+                    actionColumn = `
                         <button onclick="deleteItem(${item.id})" class="text-red-600 hover:text-red-800 font-medium text-xs bg-red-50 hover:bg-red-100 px-3 py-1 rounded">
                             Delete
                         </button>
-                    </td>
-                </tr>
-            `).join('');
+                    `;
+                }
+
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-3 font-medium text-gray-600">#${item.id}</td>
+                        <td class="p-3 font-semibold text-gray-800">${item.name}</td>
+                        <td class="p-3 text-gray-600">${item.category ? item.category.name : 'N/A'}</td>
+                        <td class="p-3">
+                            <span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">${item.condition}</span>
+                        </td>
+                        <td class="p-3">
+                            ${item.is_available
+                                ? '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Available</span>'
+                                : '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Issued</span>'}
+                        </td>
+                        <td class="p-3 text-right">
+                            ${actionColumn}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
         } catch (err) {
             console.error('Error fetching items:', err);
         }
     }
 
-    // 3. Add New Item Submit
-    document.getElementById('addItemForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
+    const addItemForm = document.getElementById('addItemForm');
+    if (addItemForm) {
+        addItemForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
 
-        const payload = {
-            name: document.getElementById('item_name').value,
-            category_id: document.getElementById('item_category').value,
-            condition: document.getElementById('item_condition').value,
-            is_available: true
-        };
+            const payload = {
+                name: document.getElementById('item_name').value,
+                category_id: document.getElementById('item_category').value,
+                condition: document.getElementById('item_condition').value,
+                is_available: true
+            };
 
-        try {
-            const res = await fetch('/api/inventory-items', {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(payload)
-            });
+            try {
+                const res = await fetch('/api/inventory-items', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(payload)
+                });
 
-            if (res.ok) {
-                document.getElementById('addItemForm').reset();
-                toggleAddForm();
-                showAlert('New item added successfully!');
-                fetchItems();
-            } else {
-                const errData = await res.json();
-                showAlert(errData.message || 'Failed to add item', false);
+                if (res.ok) {
+                    addItemForm.reset();
+                    toggleAddForm();
+                    showAlert('New item added successfully!');
+                    fetchItems();
+                } else {
+                    const errData = await res.json();
+                    showAlert(errData.message || 'Failed to add item', false);
+                }
+            } catch (err) {
+                showAlert('Network error while adding item.', false);
             }
-        } catch (err) {
-            showAlert('Network error while adding item.', false);
-        }
-    });
+        });
+    }
 
-    // 4. Delete Item
     async function deleteItem(id) {
-        if (!confirm('Kya aap waqai is item ko delete karna chahte hain?')) return;
+        if (!confirm('Are you sure you want to delete this item?')) return;
 
         try {
             const res = await fetch(`/api/inventory-items/${id}`, {
@@ -243,8 +271,12 @@
         }
     }
 
-    // Initial Load
-    loadCategories();
-    fetchItems();
+    async function init() {
+        await checkUserRole();
+        loadCategories();
+        fetchItems();
+    }
+
+    init();
 </script>
 @endsection

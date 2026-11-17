@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
-use App\Models\User;
 
 class AuthTest extends TestCase
 {
@@ -19,7 +19,7 @@ class AuthTest extends TestCase
         ]);
 
         $response->assertStatus(201)
-                 ->assertJsonStructure(['access_token', 'user']);
+            ->assertJsonStructure(['access_token', 'user']);
     }
 
     public function test_user_can_login()
@@ -35,6 +35,6 @@ class AuthTest extends TestCase
         ]);
 
         $response->assertStatus(200)
-                 ->assertJsonStructure(['access_token', 'user']);
+            ->assertJsonStructure(['access_token', 'user']);
     }
 }

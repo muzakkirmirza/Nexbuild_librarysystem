@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\ItemMaintenanceLog;
 use App\Http\Resources\ItemMaintenanceLogResource;
+use App\Models\ItemMaintenanceLog;
 use Illuminate\Http\Request;
 
 class ItemMaintenanceLogController extends Controller
@@ -23,6 +23,7 @@ class ItemMaintenanceLogController extends Controller
         ]);
 
         $log = ItemMaintenanceLog::create($validated);
+
         return new ItemMaintenanceLogResource($log->load('item'));
     }
 
@@ -30,7 +31,7 @@ class ItemMaintenanceLogController extends Controller
     {
         $log = ItemMaintenanceLog::with('item')->find($id);
 
-        if (!$log) {
+        if (! $log) {
             return response()->json(['message' => 'Maintenance log not found'], 404);
         }
 
@@ -41,7 +42,7 @@ class ItemMaintenanceLogController extends Controller
     {
         $log = ItemMaintenanceLog::find($id);
 
-        if (!$log) {
+        if (! $log) {
             return response()->json(['message' => 'Maintenance log not found'], 404);
         }
 
@@ -52,6 +53,7 @@ class ItemMaintenanceLogController extends Controller
         ]);
 
         $log->update($validated);
+
         return new ItemMaintenanceLogResource($log->load('item'));
     }
 
@@ -59,11 +61,12 @@ class ItemMaintenanceLogController extends Controller
     {
         $log = ItemMaintenanceLog::find($id);
 
-        if (!$log) {
+        if (! $log) {
             return response()->json(['message' => 'Maintenance log not found'], 404);
         }
 
         $log->delete();
+
         return response()->json(['message' => 'Maintenance log deleted successfully'], 200);
     }
 }

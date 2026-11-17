@@ -9,7 +9,7 @@
                     Borrow Requests 
                     <span id="role-badge" class="ml-4 px-3 py-1 bg-gray-200 text-gray-800 rounded-full text-xs font-bold uppercase">Loading Role...</span>
                 </h2>
-                <p class="text-sm text-gray-500">Items borrow karne ki request bhejein aur pending requests approve/reject karein</p>
+                <p class="text-sm text-gray-500">Submit item borrow requests and manage pending approvals</p>
             </div>
             <button onclick="toggleRequestForm()" class="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-md shadow">
                 + New Borrow Request
@@ -63,7 +63,7 @@
     <div class="bg-white p-6 rounded-lg shadow-md">
         <div class="mb-4">
             <h2 class="text-xl font-bold text-gray-800">Loan Transactions (Issued & Returned)</h2>
-            <p class="text-sm text-gray-500">Approved items ki issue aur return history track karein</p>
+            <p class="text-sm text-gray-500">Track item issuance and return history</p>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
@@ -86,6 +86,32 @@
     </div>
 </div>
 
+<div id="receipt-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full shadow-2xl relative">
+        <div id="receipt-content" class="space-y-4 text-gray-800">
+            <div class="text-center border-b pb-3">
+                <h3 class="text-xl font-bold text-indigo-700">Campus Library System</h3>
+                <p class="text-xs text-gray-500">Official Item Borrow Receipt & Gate Pass</p>
+            </div>
+            <div class="text-sm space-y-2">
+                <p><strong>Receipt ID:</strong> #SLIP-<span id="slip-id"></span></p>
+                <p><strong>Borrower Name:</strong> <span id="slip-borrower"></span></p>
+                <p><strong>Item Name:</strong> <span id="slip-item"></span></p>
+                <p><strong>Issue Date:</strong> <span id="slip-issue"></span></p>
+                <p><strong>Due Date:</strong> <span id="slip-due"></span></p>
+                <div class="p-2 bg-green-50 border border-green-200 text-green-800 text-xs rounded text-center font-bold">
+                    STATUS: APPROVED (Authorized by Muzakkir Mirza)
+                </div>
+            </div>
+            <p class="text-xs text-gray-400 text-center pt-2">Note: This is a system-generated slip and does not require a physical signature.</p>
+        </div>
+        <div class="mt-6 flex gap-2">
+            <button onclick="printReceipt()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded font-semibold text-sm">Print / Download Slip</button>
+            <button onclick="closeReceiptModal()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded text-sm">Close</button>
+        </div>
+    </div>
+</div>
+
 <script>
     const authToken = localStorage.getItem('auth_token');
     if (!authToken) window.location.href = '/login';
@@ -100,7 +126,8 @@
 
     const nextWeek = new Date();
     nextWeek.setDate(nextWeek.getDate() + 7);
-    document.getElementById('due_date').value = nextWeek.toISOString().split('T')[0];
+    const dueDateInput = document.getElementById('due_date');
+    if (dueDateInput) dueDateInput.value = nextWeek.toISOString().split('T')[0];
 
     function toggleRequestForm() {
         document.getElementById('request-form-box').classList.toggle('hidden');
@@ -120,33 +147,39 @@
             const data = await res.json();
             userRole = data.role || 'student';
             
-            // Set Role Badge UI
             const badge = document.getElementById('role-badge');
-            badge.innerText = userRole + ' View';
-            badge.className = userRole === 'admin' 
-                ? 'ml-4 px-3 py-1 bg-purple-200 text-purple-800 rounded-full text-xs font-bold uppercase' 
-                : 'ml-4 px-3 py-1 bg-blue-200 text-blue-800 rounded-full text-xs font-bold uppercase';
+            if (badge) {
+                badge.innerText = userRole + ' View';
+                badge.className = userRole === 'admin' 
+                    ? 'ml-4 px-3 py-1 bg-purple-200 text-purple-800 rounded-full text-xs font-bold uppercase' 
+                    : 'ml-4 px-3 py-1 bg-blue-200 text-blue-800 rounded-full text-xs font-bold uppercase';
+            }
         } catch (err) { console.error('Error fetching user role:', err); }
     }
 
     async function loadAvailableItems() {
         try {
             const res = await fetch('/api/inventory-items?is_available=true', { headers });
-            const items = (await res.json()).data || await res.json();
+            const json = await res.json();
+            const items = json.data || json;
             const select = document.getElementById('inventory_item_id');
-            select.innerHTML = '<option value="">Select Available Item</option>';
-            items.forEach(item => {
-                select.innerHTML += `<option value="${item.id}">${item.name} (#${item.id})</option>`;
-            });
+            if (select) {
+                select.innerHTML = '<option value="">Select Available Item</option>';
+                items.forEach(item => {
+                    select.innerHTML += `<option value="${item.id}">${item.name} (#${item.id})</option>`;
+                });
+            }
         } catch (err) {}
     }
 
     async function fetchBorrowRequests() {
         try {
             const res = await fetch('/api/borrow-requests', { headers });
-            const requests = (await res.json()).data || await res.json();
+            const json = await res.json();
+            const requests = json.data || json;
             const tbody = document.getElementById('requests-table-body');
-            if (requests.length === 0) {
+            
+            if (!requests || requests.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-gray-500">No borrow requests found.</td></tr>';
                 return;
             }
@@ -155,6 +188,7 @@
                 const status = (req.status || 'pending').toLowerCase();
                 const userName = req.user ? req.user.name : `User #${req.user_id || ''}`;
                 const itemName = req.item ? req.item.name : (req.inventory_item ? req.inventory_item.name : `Item #${req.inventory_item_id}`);
+                const issueDate = req.updated_at ? req.updated_at.split('T')[0] : new Date().toISOString().split('T')[0];
                 
                 let badgeClass = status === 'approved' ? 'bg-green-100 text-green-800' : (status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800');
 
@@ -165,11 +199,22 @@
                             <button onclick="updateRequestStatus(${req.id}, 'approved')" class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 rounded">Approve</button>
                             <button onclick="updateRequestStatus(${req.id}, 'rejected')" class="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1 rounded">Reject</button>
                         `;
+                    } else if (status === 'approved') {
+                        actionButtons = `
+                            <button onclick="viewReceipt(${req.id}, '${userName}', '${itemName}', '${issueDate}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded">View Slip</button>
+                            <span class="text-xs text-gray-400 ml-1">Processed</span>
+                        `;
                     } else {
                         actionButtons = '<span class="text-xs text-gray-400">Processed</span>';
                     }
                 } else {
-                    actionButtons = status === 'pending' ? '<span class="text-xs text-amber-600 font-semibold">Waiting for Admin</span>' : '<span class="text-xs text-gray-400">Processed</span>';
+                    if (status === 'approved') {
+                        actionButtons = `
+                            <button onclick="viewReceipt(${req.id}, '${userName}', '${itemName}', '${issueDate}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded">View Slip</button>
+                        `;
+                    } else {
+                        actionButtons = status === 'pending' ? '<span class="text-xs text-amber-600 font-semibold">Waiting for Admin</span>' : '<span class="text-xs text-gray-400">Processed</span>';
+                    }
                 }
 
                 return `
@@ -178,19 +223,21 @@
                         <td class="p-3 text-gray-800">${userName}</td>
                         <td class="p-3 font-semibold text-gray-800">${itemName}</td>
                         <td class="p-3"><span class="px-2 py-1 text-xs font-semibold rounded-full capitalize ${badgeClass}">${status}</span></td>
-                        <td class="p-3 text-right space-x-2">${actionButtons}</td>
+                        <td class="p-3 text-right space-x-1">${actionButtons}</td>
                     </tr>
                 `;
             }).join('');
-        } catch (err) {}
+        } catch (err) { console.error(err); }
     }
 
     async function fetchLoanTransactions() {
         try {
             const res = await fetch('/api/loan-transactions', { headers });
-            const loans = (await res.json()).data || await res.json();
+            const json = await res.json();
+            const loans = json.data || json;
             const tbody = document.getElementById('loans-table-body');
-            if (loans.length === 0) {
+            
+            if (!loans || loans.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-gray-500">No loan transactions yet.</td></tr>';
                 return;
             }
@@ -224,29 +271,63 @@
         } catch (err) {}
     }
 
-    document.getElementById('borrowRequestForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        try {
-            const res = await fetch('/api/borrow-requests', {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ inventory_item_id: document.getElementById('inventory_item_id').value })
-            });
-            if (res.ok) {
-                document.getElementById('borrowRequestForm').reset();
-                toggleRequestForm();
-                showAlert('Borrow request submitted successfully!');
-                fetchBorrowRequests();
-                loadAvailableItems();
-            } else {
-                showAlert('Failed to submit borrow request.', false);
-            }
-        } catch (err) {}
-    });
+    function viewReceipt(id, borrower, item, issue) {
+        document.getElementById('slip-id').innerText = id;
+        document.getElementById('slip-borrower').innerText = borrower;
+        document.getElementById('slip-item').innerText = item;
+        document.getElementById('slip-issue').innerText = issue;
+        document.getElementById('slip-due').innerText = '7 Days from Issue';
+        
+        document.getElementById('receipt-modal').classList.remove('hidden');
+    }
+
+    function closeReceiptModal() {
+        document.getElementById('receipt-modal').classList.add('hidden');
+    }
+
+    function printReceipt() {
+        const printContents = document.getElementById('receipt-content').innerHTML;
+        const originalContents = document.body.innerHTML;
+        document.body.innerHTML = printContents;
+        window.print();
+        document.body.innerHTML = originalContents;
+        window.location.reload();
+    }
+
+    const borrowForm = document.getElementById('borrowRequestForm');
+    if (borrowForm) {
+        borrowForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            try {
+                const res = await fetch('/api/borrow-requests', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ 
+                        inventory_item_id: document.getElementById('inventory_item_id').value,
+                        due_date: document.getElementById('due_date').value,
+                        notes: document.getElementById('notes').value
+                    })
+                });
+                if (res.ok) {
+                    borrowForm.reset();
+                    toggleRequestForm();
+                    showAlert('Borrow request submitted successfully!');
+                    fetchBorrowRequests();
+                    loadAvailableItems();
+                } else {
+                    showAlert('Failed to submit borrow request.', false);
+                }
+            } catch (err) {}
+        });
+    }
 
     async function updateRequestStatus(id, status) {
         try {
-            const res = await fetch(`/api/borrow-requests/${id}`, { method: 'PUT', headers, body: JSON.stringify({ status }) });
+            const res = await fetch(`/api/borrow-requests/${id}`, { 
+                method: 'PUT', 
+                headers, 
+                body: JSON.stringify({ status }) 
+            });
             if (res.ok) {
                 showAlert(`Request ${status} successfully!`);
                 fetchBorrowRequests();
@@ -259,10 +340,12 @@
     }
 
     async function markLoanReturned(id) {
-        if (!confirm('Kya aap is item ko returned mark karna chahte hain?')) return;
+        if (!confirm('Are you sure you want to mark this item as returned?')) return;
         try {
             const res = await fetch(`/api/loan-transactions/${id}`, {
-                method: 'PUT', headers, body: JSON.stringify({ status: 'returned', return_date: new Date().toISOString().split('T')[0] })
+                method: 'PUT', 
+                headers, 
+                body: JSON.stringify({ status: 'returned', return_date: new Date().toISOString().split('T')[0] })
             });
             if (res.ok) {
                 showAlert('Item marked as returned!');
